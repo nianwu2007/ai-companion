@@ -2,7 +2,6 @@ package com.aicompanion.client;
 
 import com.aicompanion.AiCompanionMod;
 import com.aicompanion.api.ActionServer;
-import com.aicompanion.client.render.CompanionEntityRenderer;
 import com.aicompanion.client.render.CompanionGeoRenderer;
 import com.aicompanion.client.render.CompanionFoxModel;
 import com.aicompanion.client.render.CompanionModelLayers;
@@ -40,7 +39,7 @@ import java.util.concurrent.CompletableFuture;
  * 客户端总装线：把各个零件接起来。
  *
  * 这里只做"接线和按键"，不含任何业务逻辑——
- *   实体渲染 ← CompanionEntityRenderer
+ *   实体渲染 ← CompanionGeoRenderer
  *   身体   ← PlayerEngine（驱动本机玩家）
  *   嘴巴耳朵 ← ChatWatcher → CompanionBrain → Voice
  *   外部遥控 ← ActionServer(127.0.0.1:8791)
@@ -98,9 +97,6 @@ public class AiCompanionClient implements ClientModInitializer {
         if (mc.runDirectory != null) {
             cfg.llm.gameDir = mc.runDirectory.getAbsolutePath();
         }
-        if (cfg.companion.autoSpawn) {
-            CompanionHandle.ensure(mc);
-        }
         boolean api = ActionServer.start(AiCompanionClient::dispatch);
         if (!announced) {
             announced = true;
@@ -116,7 +112,6 @@ public class AiCompanionClient implements ClientModInitializer {
     }
 
     private void onLeave(MinecraftClient mc) {
-        CompanionHandle.remove(mc);
         ActionServer.stop();
         announced = false;
     }
@@ -128,10 +123,6 @@ public class AiCompanionClient implements ClientModInitializer {
         if (mc.player == null || mc.world == null) {
             return;
         }
-        if (AiConfig.INSTANCE.companion.autoSpawn) {
-            CompanionHandle.ensure(mc);
-        }
-        CompanionHandle.tick(mc);
         PlayerEngine.INSTANCE.tick(mc);
 
         while (KEY_TALK.wasPressed()) {
@@ -172,13 +163,11 @@ public class AiCompanionClient implements ClientModInitializer {
     }
 
     private void toggleCompanion(MinecraftClient mc) {
+        // 小怜已是服务端实体，召唤/收回交给服务端，这里只报个状态
         if (CompanionHandle.get(mc) != null) {
-            CompanionHandle.remove(mc);
-            PlayerEngine.INSTANCE.stopAll();
-            say("我先退到一边。");
+            say("我在这儿呢。");
         } else {
-            CompanionHandle.ensure(mc);
-            say("我在这儿。");
+            say("我还没跟上你，等你进一次世界我就来了。");
         }
     }
 

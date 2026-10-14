@@ -275,15 +275,6 @@ public final class PlayerEngine implements State.Provider {
     // ---------------------------------------------------------------- 各动作
 
     private void doGoto(MinecraftClient mc, ClientPlayerEntity p, Action a) {
-        // 优先让小怜（女仆）自己寻路走过去
-        Entity e = CompanionHandle.get(mc);
-        if (e instanceof AICompanionEntity c) {
-            c.navigateTo(new BlockPos((int) Math.floor(a.x()),
-                    (int) Math.floor(a.y() > 0 ? a.y() : p.getY()),
-                    (int) Math.floor(a.z())));
-            done("让小怜走到 " + (int) a.x() + " " + (int) a.z());
-            return;
-        }
         Vec3d target = new Vec3d(Math.floor(a.x()) + 0.5, a.y() > 0 ? a.y() : p.getY(), Math.floor(a.z()) + 0.5);
         if (baritoneOwns) {
             if (!BaritoneBridge.isPathing()) {
@@ -388,11 +379,6 @@ public final class PlayerEngine implements State.Provider {
                     : Blueprint.cottage(origin, buildMaterial);
             buildQueue = new ArrayDeque<>(plan);
             lastNote = (big ? "别墅" : "木屋") + "开工：共 " + plan.size() + " 块，用 " + buildMaterial;
-            // 让小怜也走到工地边上"看着"
-            Entity companion = CompanionHandle.get(mc);
-            if (companion instanceof AICompanionEntity c) {
-                c.navigateTo(origin.add(0, 1, 0));
-            }
             return;
         }
         if (buildQueue.isEmpty()) {
