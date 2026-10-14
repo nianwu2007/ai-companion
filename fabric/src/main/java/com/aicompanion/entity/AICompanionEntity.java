@@ -21,8 +21,12 @@ import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.collection.DefaultedList;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+
+import com.aicompanion.engine.AStar;
 
 import software.bernie.geckolib.core.animatable.GeoAnimatable;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
@@ -33,6 +37,7 @@ import software.bernie.geckolib.core.animation.RawAnimation;
 import software.bernie.geckolib.core.object.PlayState;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -60,6 +65,9 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
     private String taskState = "idle";
     private Vec3d lookTarget;
     private boolean sitting = false;
+    /** goto 寻路：路径点 + 当前下标。 */
+    private List<BlockPos> path = null;
+    private int pathIndex = 0;
 
     public AICompanionEntity(EntityType<? extends PathAwareEntity> type, World world) {
         super(type, world);
@@ -334,9 +342,26 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
             return;
         }
 
-        // 客户端手动驱动 AI 目标 + 寻路（原版 mobTick 只在服务端跑）
-        this.goalSelector.tick();
-        this.getNavigation().tick();
+        // 优先执行 goto 寻路路径
+        if (this.path != null) {
+            if (this.pathIndex >= this.path.size()) {
+                this.path = null;
+                this.setTaskState("idle");
+            } else {
+                BlockPos wp = this.path.get(this.pathIndex);
+                double dx = wp.getX() + 0.5 - this.getX();
+                double dz = wp.getZ() + 0.5 - this.getZ();
+                if (dx * dx + dz * dz < 0.25) {
+                    this.pathIndex++;
+                } else {
+                    this.getMoveControl().moveTo(wp.getX() + 0.5, wp.getY(), wp.getZ() + 0.5, 1.0);
+                }
+            }
+        } else {
+            // 平时：客户端手动驱动 AI 目标 + 寻路（原版 mobTick 只在服务端跑）
+            this.goalSelector.tick();
+            this.getNavigation().tick();
+        }
 
         // 空手时偶尔冒个粒子，方便在人群里找到她
         if (this.age % 12 == 0 && this.getStack(0).isEmpty() && this.random.nextFloat() < 0.08f) {
@@ -346,6 +371,23 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
                     this.getZ() + (this.random.nextDouble() - 0.5) * 0.6,
                     0.0, 0.0, 0.0);
         }
+    }
+
+    /** 让小怜用 A* 寻路走到目标（goto 指令用）。 */
+    public void navigateTo(BlockPos goal) {
+        if (this.getWorld() instanceof ClientWorld cw) {
+            List<BlockPos> nodes = AStar.find(cw, this.getBlockPos(), goal, 600, 300);
+            if (nodes != null && !nodes.isEmpty()) {
+                this.path = nodes;
+                this.pathIndex = 1; // 跳过起点（自己脚下这格）
+                this.setTaskState("goto");
+            }
+        }
+    }
+
+    /** 是否正在按 goto 路径走。 */
+    public boolean isNavigating() {
+        return this.path != null;
     }
 
     // ------------------------------------------------------------ AI 行为
