@@ -1,0 +1,9 @@
+{
+  "category.aicompanion": "AI Companion",
+  "key.aicompanion.talk": "Hold to talk (voice input)",
+  "key.aicompanion.toggle": "Summon / recall companion",
+  "key.aicompanion.stop": "Tell companion to stop",
+  "key.aicompanion.status": "Companion status",
+  "entity.aicompanion.ai_companion": "AI Companion",
+  "item.aicompanion.companion_token": "Companion Token"
+}

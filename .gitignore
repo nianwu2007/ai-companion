@@ -1,0 +1,37 @@
+# 构建产物
+build/
+*/build/
+out/
+bin/
+.gradle/
+**/.gradle/
+
+# 运行目录与日志
+run/
+logs/
+*.log
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+.eclipse/
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 密钥与本地配置：永不入库
+.env
+.env.*
+*.env
+config/aicompanion.json
+config/aicompanion.key
+*.key
+*token*.txt

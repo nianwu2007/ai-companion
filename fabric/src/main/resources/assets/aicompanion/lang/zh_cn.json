@@ -1,0 +1,9 @@
+{
+  "category.aicompanion": "AI 同伴",
+  "key.aicompanion.talk": "按住说话（语音输入）",
+  "key.aicompanion.toggle": "召唤 / 收回同伴",
+  "key.aicompanion.stop": "让同伴停下",
+  "key.aicompanion.status": "查看同伴状态",
+  "entity.aicompanion.ai_companion": "AI 同伴",
+  "item.aicompanion.companion_token": "同伴信物"
+}

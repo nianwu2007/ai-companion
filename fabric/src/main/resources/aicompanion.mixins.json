@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.aicompanion.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "ChatHudMixin",
+    "ClientPlayNetworkHandlerMixin",
+    "InputMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

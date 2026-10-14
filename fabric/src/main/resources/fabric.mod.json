@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "aicompanion",
+  "version": "${version}",
+  "name": "AI Companion",
+  "description": "AI 玩家同伴：玩家模型实体 + 物品栏/挖掘/放置 + Baritone 异步寻路 + 本地 LLM/Ollama 行动 + DeepSeek 聊天 + Vosk 语音输入 + Kokoro/Edge 语音输出 + Hermes 桥接。",
+  "authors": [
+    "AI Companion"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "mixins": [
+    "aicompanion.mixins.json"
+  ],
+  "entrypoints": {
+    "main": [
+      "com.aicompanion.AiCompanionMod"
+    ],
+    "client": [
+      "com.aicompanion.client.AiCompanionClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "fabric-api": "*",
+    "minecraft": "~1.20.1",
+    "java": ">=17"
+  },
+  "suggests": {
+    "baritone": "*",
+    "automatone": "*",
+    "vosk": "*"
+  }
+}
