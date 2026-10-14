@@ -67,6 +67,8 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
     private int pathIndex = 0;
     /** 自管的重力/跳跃速度。 */
     private double fallStep = 0;
+    /** 跟随时的重算路径节流。 */
+    private int repathTimer = 0;
 
     public AICompanionEntity(EntityType<? extends PathAwareEntity> type, World world) {
         super(type, world);
@@ -353,6 +355,7 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         if (this.path != null) {
             if (this.pathIndex >= this.path.size()) {
                 this.path = null;
+                this.repathTimer = 0;
                 this.setTaskState("idle");
             } else {
                 BlockPos wp = this.path.get(this.pathIndex);
@@ -364,12 +367,19 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
                 }
             }
         } else {
-            // 跟随主人（保持 1.5~3 格）
+            // 跟随主人：走远了就用 A* 寻路绕障碍，别直线撞墙
             PlayerEntity owner = resolveOwner();
             if (owner != null && !owner.isRemoved()) {
                 double distSq = squaredDistanceTo(owner);
                 if (distSq > 9.0) {
-                    stepToward(owner.getPos(), 0.18);
+                    if (--this.repathTimer <= 0) {
+                        this.repathTimer = 12;
+                        this.navigateTo(owner.getBlockPos());
+                    }
+                    // 寻路没成功（太远/被挡）就直线凑合
+                    if (this.path == null) {
+                        stepToward(owner.getPos(), 0.18);
+                    }
                 } else if (distSq > 2.25) {
                     stepToward(owner.getPos(), 0.10);
                 }
@@ -451,7 +461,14 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
             this.insert(best.getStack());
             best.discard();
         } else if (dd > 4.0) {
-            stepToward(best.getPos(), 0.16);
+            // 路远就寻路过去，别一路撞过去
+            if (this.path == null && --this.repathTimer <= 0) {
+                this.repathTimer = 20;
+                this.navigateTo(best.getBlockPos());
+            }
+            if (this.path == null) {
+                stepToward(best.getPos(), 0.16);
+            }
         }
     }
 
