@@ -95,6 +95,9 @@ public final class PlayerEngine implements State.Provider {
     private Action current;
     private int ticksInAction;
     private boolean reached;
+    /** 造房子：待砌的方块队列 + 用的材料。 */
+    private java.util.Deque<Blueprint.Step> buildQueue = null;
+    private String buildMaterial = null;
     private final List<BlockPos> waypoints = new ArrayList<>();
     private int waypointIndex;
     private BlockPos mineTarget;
@@ -194,6 +197,7 @@ public final class PlayerEngine implements State.Provider {
                 case "goto" -> doGoto(mc, p, current);
                 case "mine" -> doMine(mc, p, current);
                 case "place" -> doPlace(mc, p, current);
+                case "build" -> doBuild(mc, p, current);
                 case "follow" -> doFollow(mc, p, current);
                 case "hold" -> doHold(mc, p, current);
                 case "drop" -> doDrop(mc, p, current);
@@ -365,6 +369,122 @@ public final class PlayerEngine implements State.Provider {
         if (!mc.world.getBlockState(target).isAir()) {
             done("放到 " + fmt(target));
         }
+    }
+
+    /** 造房子：按蓝图逐块砌，够不着就走过去，一块块往上垒。 */
+    private void doBuild(MinecraftClient mc, ClientPlayerEntity p, Action a) {
+        if (buildQueue == null) {
+            String kind = a.item() == null ? "" : a.item().trim().toLowerCase(Locale.ROOT);
+            boolean big = kind.contains("villa") || kind.contains("别墅") || kind.contains("大楼")
+                    || kind.contains("big") || kind.contains("large");
+            buildMaterial = pickMaterial(p);
+            // 起点放在玩家前方，免得把自己封墙里
+            Vec3d look = p.getRotationVec(1.0f);
+            int fwd = big ? 8 : 6;
+            BlockPos origin = p.getBlockPos()
+                    .add((int) Math.round(look.x * fwd), 0, (int) Math.round(look.z * fwd)).up();
+            List<Blueprint.Step> plan = big
+                    ? Blueprint.villa(origin, buildMaterial)
+                    : Blueprint.cottage(origin, buildMaterial);
+            buildQueue = new ArrayDeque<>(plan);
+            lastNote = (big ? "别墅" : "木屋") + "开工：共 " + plan.size() + " 块，用 " + buildMaterial;
+            // 让小怜也走到工地边上"看着"
+            Entity companion = CompanionHandle.get(mc);
+            if (companion instanceof AICompanionEntity c) {
+                c.navigateTo(origin.add(0, 1, 0));
+            }
+            return;
+        }
+        if (buildQueue.isEmpty()) {
+            buildQueue = null;
+            done("房子造好了");
+            return;
+        }
+        Blueprint.Step s = buildQueue.peek();
+        if (!mc.world.getBlockState(s.pos()).isAir()) {
+            buildQueue.poll(); // 那儿已经有东西了，跳过
+            return;
+        }
+        double reach = AiConfig.INSTANCE.engine.reach;
+        Vec3d center = Vec3d.ofCenter(s.pos());
+        if (p.getEyePos().distanceTo(center) > reach - 0.5) {
+            if (!ensurePath(mc, p, center)) {
+                buildQueue.poll(); // 走不过去，跳过这块
+                return;
+            }
+            followPath(mc, p, center);
+            return;
+        }
+        release();
+        ensureHolding(p, buildMaterial);
+        if (tryPlace(mc, p, s.pos())) {
+            buildQueue.poll();
+            if (buildQueue.size() % 16 == 0 && buildQueue.size() > 0) {
+                lastNote = "还剩 " + buildQueue.size() + " 块";
+            }
+        }
+    }
+
+    /** 往某个空位放一块，成功返回 true。 */
+    private boolean tryPlace(MinecraftClient mc, ClientPlayerEntity p, BlockPos target) {
+        BlockPos neighbor = null;
+        Direction face = null;
+        for (Direction d : Direction.values()) {
+            BlockPos n = target.offset(d);
+            if (!mc.world.getBlockState(n).isAir()) {
+                neighbor = n;
+                face = d.getOpposite();
+                break;
+            }
+        }
+        if (neighbor == null || face == null) {
+            return false; // 悬空，没依托放不了
+        }
+        Vec3d center = Vec3d.ofCenter(target);
+        Step.look(p, center);
+        Vec3d hit = Vec3d.ofCenter(neighbor).add(Vec3d.of(face.getVector()).multiply(0.5));
+        if (mc.interactionManager != null) {
+            mc.interactionManager.interactBlock(p, Hand.MAIN_HAND,
+                    new BlockHitResult(hit, face, neighbor, false));
+            p.swingHand(Hand.MAIN_HAND);
+        }
+        return !mc.world.getBlockState(target).isAir();
+    }
+
+    /** 从背包里挑一种能用的木建材。 */
+    private String pickMaterial(ClientPlayerEntity p) {
+        String[] prefs = {"oak_planks", "spruce_planks", "birch_planks", "jungle_planks",
+                "acacia_planks", "dark_oak_planks", "mangrove_planks", "cherry_planks",
+                "bamboo_planks", "crimson_planks", "warped_planks",
+                "oak_log", "spruce_log", "birch_log"};
+        for (String k : prefs) {
+            if (countInInventory(p, k) > 0) {
+                return "minecraft:" + k;
+            }
+        }
+        return "minecraft:oak_planks";
+    }
+
+    private int countInInventory(ClientPlayerEntity p, String itemPath) {
+        int n = 0;
+        for (int i = 0; i < p.getInventory().size(); i++) {
+            ItemStack st = p.getInventory().getStack(i);
+            if (st.isEmpty()) continue;
+            if (Registries.ITEM.getId(st.getItem()).getPath().equals(itemPath)) {
+                n += st.getCount();
+            }
+        }
+        return n;
+    }
+
+    /** 把手里的换成指定材料，没有就不动。 */
+    private void ensureHolding(ClientPlayerEntity p, String item) {
+        if (item == null || item.isBlank()) return;
+        ItemStack held = p.getMainHandStack();
+        if (!held.isEmpty() && Registries.ITEM.getId(held.getItem()).toString().equals(item)) {
+            return;
+        }
+        selectItem(p, item);
     }
 
     private void doFollow(MinecraftClient mc, ClientPlayerEntity p, Action a) {

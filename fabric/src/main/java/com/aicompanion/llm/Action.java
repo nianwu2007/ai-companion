@@ -11,6 +11,7 @@ import java.util.Map;
  *   goto    x z        走到坐标（y 可选，自动选落脚点）
  *   mine    x y z      挖掉这个方块（count 次）
  *   place   x y z      在坐标放物品（item = minecraft:xxx）
+ *   build   item       造房子（item 写 cottage 木屋 / villa 别墅）
  *   follow             跟随玩家
  *   stop               停下（清空队列 + 关跟随）
  *   jump               跳一下

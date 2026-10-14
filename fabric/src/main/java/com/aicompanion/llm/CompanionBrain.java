@@ -49,7 +49,8 @@ public final class CompanionBrain {
             {"say":"对玩家说的一句中文（可空）","actions":[{"type":"...","x":0,"y":0,"z":0,"item":"...","count":0,"ticks":0}]}
             actions 可用类型：
             goto(x,z) 走到坐标 | mine(x,y,z) 挖方块 | place(x,y,z,item) 放方块 | follow 跟着玩家
-            stop 停下 | jump 跳 | sit 让小怜坐下 | stand 让她站起来 | hold(item) 换手持 | drop(count) 丢东西 | use 用一下手上物品
+            造房子用 build，item 写 villa 就是别墅、cottage 是小木屋（玩家说"造房子/盖别墅"时用这个，不用自己排坐标）
+            stop 停下 | jump 跳 | sit 让小怜坐下 | stand 让她站起来 | build(item) 造房子 | hold(item) 换手持 | drop(count) 丢东西 | use 用一下手上物品
             attack 打最近的怪 | wait(ticks) 等一会儿 | say 只说一句话（不写进 actions，写进 say 字段）
             坐标只能用状态里给出的真实坐标；不确定就 follow 或 wait。最多 3 个动作，按顺序执行。
             """;
