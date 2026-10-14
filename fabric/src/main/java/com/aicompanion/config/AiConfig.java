@@ -58,8 +58,8 @@ public final class AiConfig {
 
     public static final class Companion {
         public String name = "小怜";
-        /** 玩家皮肤贴图；默认借用原版 Steve，可换成自己的皮肤路径。 */
-        public String texture = "minecraft:textures/entity/player/wide/steve.png";
+        /** 玩家皮肤贴图；默认随 mod 附带一张女仆装皮肤，可换成自己的皮肤路径。 */
+        public String texture = "aicompanion:textures/entity/maid.png";
         public boolean slimArms = false;
         public double followRadius = 6.0;
         public double walkSpeed = 0.22;

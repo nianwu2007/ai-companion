@@ -37,7 +37,7 @@ mod 是纯客户端 mod，`environment` 写作 `client`，专用服务器上不�
 | `llm.maxTokens` | `220` | 单次回复上限 |
 | `llm.requestTimeoutSeconds` | `60` | 本地模型冷启动慢就加大 |
 | `companion.name` | `小怜` | 头顶名字 |
-| `companion.texture` | 原版 Steve 皮肤 | 可换成自己的皮肤路径 |
+| `companion.texture` | 随包附带的女仆装皮肤 `aicompanion:textures/entity/maid.png` | 可换成任意皮肤贴图资源 |
 | `companion.followRadius` | `6.0` | 跟随距离 |
 | `companion.autoSpawn` | `true` | 进世界是否自动出现 |
 | `engine.reach` | `4.5` | 交互距离 |
