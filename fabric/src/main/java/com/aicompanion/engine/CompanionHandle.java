@@ -109,9 +109,12 @@ public final class CompanionHandle {
             ground = ground.down();
         }
         if (mc.world.getBlockState(ground).isAir()) {
-            ground = base;
+            // 脚下四格内没找到实地（悬空 / 水里 / 站边缘），贴着玩家当前高度站
+            return new Vec3d(base.getX() + 0.5, p.y, base.getZ() + 0.5);
         }
-        return new Vec3d(ground.getX() + 0.5, ground.getY(), ground.getZ() + 0.5);
+        // ground 是实心方块本身，脚底必须站在它的顶面，即 getY() + 1，
+        // 否则实体脚底会落在方块底面里，整个人陷进去一格。
+        return new Vec3d(ground.getX() + 0.5, ground.getY() + 1, ground.getZ() + 0.5);
     }
 
     public static void remove(MinecraftClient mc) {

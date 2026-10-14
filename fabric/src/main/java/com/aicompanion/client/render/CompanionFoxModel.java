@@ -38,36 +38,36 @@ public class CompanionFoxModel extends Model {
         ModelData data = new ModelData();
         ModelPartData root = data.getRoot();
 
-        // ---- 一对狐耳（外橙毛，内里一块浅色耳心）
+        // ---- 一对狐耳：头顶两侧，各向上冒 6 像素（这里是像素，1 格 = 16）
         ModelPartData earR = root.addChild("right_ear", ModelPartBuilder.create()
-                        .uv(0, 0).cuboid(-0.09f, -0.30f, -0.05f, 0.18f, 0.30f, 0.10f),
-                ModelTransform.pivot(-0.13f, 1.50f, 0.0f));
+                        .uv(0, 0).cuboid(-1.5f, -6.0f, -1.0f, 3.0f, 6.0f, 2.0f),
+                ModelTransform.pivot(-3.0f, 0.0f, 0.0f));
         earR.addChild("inner", ModelPartBuilder.create()
-                        .uv(16, 0).cuboid(-0.062f, -0.255f, -0.028f, 0.124f, 0.22f, 0.03f),
-                ModelTransform.pivot(0.0f, 0.0f, -0.055f));
+                        .uv(32, 32).cuboid(-1.0f, -5.0f, -0.35f, 2.0f, 4.0f, 0.4f),
+                ModelTransform.pivot(0.0f, 0.0f, -1.05f));
 
         ModelPartData earL = root.addChild("left_ear", ModelPartBuilder.create()
-                        .uv(0, 0).cuboid(-0.09f, -0.30f, -0.05f, 0.18f, 0.30f, 0.10f),
-                ModelTransform.pivot(0.13f, 1.50f, 0.0f));
+                        .uv(0, 0).cuboid(-1.5f, -6.0f, -1.0f, 3.0f, 6.0f, 2.0f),
+                ModelTransform.pivot(3.0f, 0.0f, 0.0f));
         earL.addChild("inner", ModelPartBuilder.create()
-                        .uv(16, 0).cuboid(-0.062f, -0.255f, -0.028f, 0.124f, 0.22f, 0.03f),
-                ModelTransform.pivot(0.0f, 0.0f, -0.055f));
+                        .uv(32, 32).cuboid(-1.0f, -5.0f, -0.35f, 2.0f, 4.0f, 0.4f),
+                ModelTransform.pivot(0.0f, 0.0f, -1.05f));
 
-        // ---- 后发：从后脑垂到肩胛的一条长发
+        // ---- 后发：贴在后脑，从发顶垂到背心，长 14 像素
         root.addChild("hair", ModelPartBuilder.create()
-                        .uv(0, 0).cuboid(-0.14f, -0.44f, 0.0f, 0.28f, 0.44f, 0.06f),
-                ModelTransform.pivot(0.0f, 1.46f, 0.10f));
+                        .uv(0, 0).cuboid(-3.0f, -6.0f, 0.0f, 6.0f, 14.0f, 2.0f),
+                ModelTransform.pivot(0.0f, 0.0f, 4.0f));
 
-        // ---- 尾巴：三节，节节收细，尾尖用白毛
+        // ---- 尾巴：三节向后伸 23 像素，节节收细，尾尖换白毛
         ModelPartData tailBase = root.addChild("tail_base", ModelPartBuilder.create()
-                        .uv(0, 0).cuboid(-0.09f, -0.09f, 0.0f, 0.18f, 0.18f, 0.30f),
-                ModelTransform.pivot(0.0f, 0.95f, 0.14f));
+                        .uv(0, 0).cuboid(-2.0f, -2.0f, 0.0f, 4.0f, 4.0f, 8.0f),
+                ModelTransform.pivot(0.0f, -10.0f, 3.0f));
         ModelPartData tailMid = tailBase.addChild("tail_mid", ModelPartBuilder.create()
-                        .uv(0, 0).cuboid(-0.08f, -0.08f, 0.0f, 0.16f, 0.16f, 0.28f),
-                ModelTransform.pivot(0.0f, 0.0f, 0.30f));
+                        .uv(0, 0).cuboid(-1.5f, -1.5f, 0.0f, 3.0f, 3.0f, 8.0f),
+                ModelTransform.pivot(0.0f, 0.0f, 8.0f));
         tailMid.addChild("tail_tip", ModelPartBuilder.create()
-                        .uv(0, 32).cuboid(-0.07f, -0.07f, 0.0f, 0.14f, 0.14f, 0.26f),
-                ModelTransform.pivot(0.0f, 0.0f, 0.28f));
+                        .uv(32, 0).cuboid(-1.5f, -1.5f, 0.0f, 3.0f, 3.0f, 7.0f),
+                ModelTransform.pivot(0.0f, 0.0f, 8.0f));
 
         return TexturedModelData.of(data, 64, 64);
     }
