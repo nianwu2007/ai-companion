@@ -35,3 +35,7 @@ config/aicompanion.json
 config/aicompanion.key
 *.key
 *token*.txt
+
+# Python 缓存
+__pycache__/
+*.pyc
