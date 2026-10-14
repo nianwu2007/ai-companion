@@ -2,9 +2,6 @@ package com.aicompanion.entity;
 
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.ai.goal.Goal;
-import net.minecraft.entity.ai.goal.LookAtEntityGoal;
-import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -68,12 +65,13 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
     /** goto 寻路：路径点 + 当前下标。 */
     private List<BlockPos> path = null;
     private int pathIndex = 0;
+    /** 自管的重力/跳跃速度。 */
+    private double fallStep = 0;
 
     public AICompanionEntity(EntityType<? extends PathAwareEntity> type, World world) {
         super(type, world);
         this.setPersistent();
         this.experiencePoints = 0;
-        this.initGoals();
     }
 
     public static DefaultAttributeContainer.Builder createCompanionAttributes() {
@@ -335,7 +333,16 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         if (!this.getWorld().isClient()) {
             return;
         }
+        try {
+            tickClient();
+        } catch (Throwable t) {
+            // 同伴自己出错不该把整个游戏带崩
+            com.aicompanion.AiCompanionMod.LOG.warn("[AICompanion] 同伴 tick 异常，已忽略: {}", t.toString());
+        }
+    }
 
+    /** 客户端的同伴逻辑，整体包了异常保护。 */
+    private void tickClient() {
         // 坐下：原地不动
         if (this.sitting) {
             this.setVelocity(0, 0, 0);
@@ -349,18 +356,25 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
                 this.setTaskState("idle");
             } else {
                 BlockPos wp = this.path.get(this.pathIndex);
-                double dx = wp.getX() + 0.5 - this.getX();
-                double dz = wp.getZ() + 0.5 - this.getZ();
-                if (dx * dx + dz * dz < 0.25) {
+                Vec3d wpt = new Vec3d(wp.getX() + 0.5, wp.getY(), wp.getZ() + 0.5);
+                if (this.getPos().squaredDistanceTo(wpt) < 0.7) {
                     this.pathIndex++;
                 } else {
-                    this.getMoveControl().moveTo(wp.getX() + 0.5, wp.getY(), wp.getZ() + 0.5, 1.0);
+                    stepToward(wpt, 0.18);
                 }
             }
         } else {
-            // 平时：客户端手动驱动 AI 目标 + 寻路（原版 mobTick 只在服务端跑）
-            this.goalSelector.tick();
-            this.getNavigation().tick();
+            // 跟随主人（保持 1.5~3 格）
+            PlayerEntity owner = resolveOwner();
+            if (owner != null && !owner.isRemoved()) {
+                double distSq = squaredDistanceTo(owner);
+                if (distSq > 9.0) {
+                    stepToward(owner.getPos(), 0.18);
+                } else if (distSq > 2.25) {
+                    stepToward(owner.getPos(), 0.10);
+                }
+            }
+            this.pickupNearby();
         }
 
         // 空手时偶尔冒个粒子，方便在人群里找到她
@@ -390,97 +404,6 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         return this.path != null;
     }
 
-    // ------------------------------------------------------------ AI 行为
-
-    /** 客户端实体默认 canMoveVoluntarily 只在 ServerWorld 返回 true，导致 travel 不位移；放开。 */
-    @Override
-    public boolean canMoveVoluntarily() {
-        return true;
-    }
-
-    @Override
-    protected void initGoals() {
-        this.goalSelector.add(1, new FollowOwnerGoal());
-        this.goalSelector.add(2, new PickupGoal());
-        this.goalSelector.add(3, new WanderAroundFarGoal(this, 0.7));
-        this.goalSelector.add(4, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-    }
-
-    /** 跟随主人：离远寻路追，近就停。 */
-    private class FollowOwnerGoal extends Goal {
-        private int pathTimer = 0;
-
-        @Override
-        public boolean canStart() {
-            if (sitting) return false;
-            PlayerEntity o = resolveOwner();
-            return o != null && !o.isRemoved() && squaredDistanceTo(o) > 9.0;
-        }
-
-        @Override
-        public boolean shouldContinue() {
-            if (sitting) return false;
-            PlayerEntity o = resolveOwner();
-            return o != null && !o.isRemoved() && squaredDistanceTo(o) > 2.25;
-        }
-
-        @Override
-        public void tick() {
-            PlayerEntity o = resolveOwner();
-            if (o == null) return;
-            getLookControl().lookAt(o, 10.0f, 10.0f);
-            if (--pathTimer <= 0) {
-                pathTimer = 10;
-                getNavigation().startMovingTo(o, 1.0);
-            }
-            // 客户端寻路没路径就直线兜底，保证能动
-            if (getNavigation().isIdle()) {
-                straightTo(o, 0.2);
-            }
-        }
-
-        @Override
-        public void stop() {
-            getNavigation().stop();
-        }
-    }
-
-    /** 捡起附近掉落物。 */
-    private class PickupGoal extends Goal {
-        private ItemEntity target;
-
-        @Override
-        public boolean canStart() {
-            if (sitting) return false;
-            target = findNearestItem();
-            return target != null;
-        }
-
-        @Override
-        public boolean shouldContinue() {
-            return !sitting && target != null && !target.isRemoved() && squaredDistanceTo(target) > 1.2;
-        }
-
-        @Override
-        public void tick() {
-            if (target == null) return;
-            getNavigation().startMovingTo(target, 1.1);
-            if (getNavigation().isIdle()) {
-                straightTo(target, 0.2);
-            }
-        }
-
-        @Override
-        public void stop() {
-            if (target != null && !target.isRemoved() && squaredDistanceTo(target) <= 2.5) {
-                insert(target.getStack());
-                target.discard();
-            }
-            target = null;
-            getNavigation().stop();
-        }
-    }
-
     private ItemEntity findNearestItem() {
         java.util.List<ItemEntity> items = this.getWorld().getEntitiesByClass(
                 ItemEntity.class, this.getBoundingBox().expand(8.0), e -> e != null && !e.isRemoved());
@@ -496,17 +419,39 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         return best;
     }
 
-    /** 直线兜底：直接位移，撞墙就跳。 */
-    private void straightTo(net.minecraft.entity.Entity target, double speed) {
-        Vec3d d = target.getPos().subtract(this.getPos());
+    /** 带自管重力的直接位移：不碰 travel / navigation / 服务端 AI，避免客户端跑 serverAiStep 崩。 */
+    private void stepToward(Vec3d target, double speed) {
+        Vec3d d = target.subtract(this.getPos());
         double h = Math.sqrt(d.x * d.x + d.z * d.z);
         if (h < 0.05) {
             return;
         }
-        this.move(net.minecraft.entity.MovementType.SELF, new Vec3d(d.x / h * speed, 0, d.z / h * speed));
-        this.faceTowards(target.getPos());
-        if (this.horizontalCollision && this.isOnGround()) {
-            this.hop();
+        double dx = d.x / h * speed;
+        double dz = d.z / h * speed;
+        if (this.isOnGround()) {
+            this.fallStep = 0;
+            if (this.horizontalCollision || d.y > 1.2) {
+                this.fallStep = 0.42; // 撞墙或目标更高 → 跳
+            }
+        } else {
+            this.fallStep = Math.max(-1.0, this.fallStep - 0.08);
+        }
+        this.move(net.minecraft.entity.MovementType.SELF, new Vec3d(dx, this.fallStep, dz));
+        this.faceTowards(target);
+    }
+
+    /** 捡起 8 格内最近的掉落物。 */
+    private void pickupNearby() {
+        ItemEntity best = findNearestItem();
+        if (best == null) {
+            return;
+        }
+        double dd = squaredDistanceTo(best);
+        if (dd <= 1.5) {
+            this.insert(best.getStack());
+            best.discard();
+        } else if (dd > 4.0) {
+            stepToward(best.getPos(), 0.16);
         }
     }
 
