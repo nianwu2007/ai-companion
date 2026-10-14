@@ -20,6 +20,15 @@ import net.minecraft.util.collection.DefaultedList;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
+import software.bernie.geckolib.core.animatable.GeoAnimatable;
+import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
+import software.bernie.geckolib.core.animation.AnimatableManager;
+import software.bernie.geckolib.core.animation.AnimationController;
+import software.bernie.geckolib.core.animation.AnimationState;
+import software.bernie.geckolib.core.animation.RawAnimation;
+import software.bernie.geckolib.core.object.PlayState;
+import software.bernie.geckolib.util.GeckoLibUtil;
+
 import java.util.UUID;
 
 /**
@@ -29,11 +38,16 @@ import java.util.UUID;
  * 「数据载体 + 渲染载体」：物品栏、装备、状态、主人。所有行为（走路 / 挖矿 / 放置）
  * 由客户端侧的 PlayerEngine 驱动，因为同伴是纯客户端实体。
  */
-public class AICompanionEntity extends PathAwareEntity {
+public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable {
 
     public static final int INV_SIZE = 36;
 
     private final DefaultedList<ItemStack> inventory = DefaultedList.ofSize(INV_SIZE, ItemStack.EMPTY);
+
+    private final AnimatableInstanceCache geoCache = GeckoLibUtil.createInstanceCache(this);
+    private static final RawAnimation ANIM_IDLE = RawAnimation.begin().thenLoop("idle");
+    private static final RawAnimation ANIM_WALK = RawAnimation.begin().thenLoop("walk");
+    private static final RawAnimation ANIM_RUN = RawAnimation.begin().thenLoop("run");
 
     private UUID ownerUuid;
     private String ownerName = "";
@@ -226,6 +240,36 @@ public class AICompanionEntity extends PathAwareEntity {
     /** 手动位移（客户端寻路用，绕开服务端寻路）。 */
     public void step(Vec3d delta) {
         this.move(net.minecraft.entity.MovementType.SELF, delta);
+    }
+
+    // ------------------------------------------------------------ geckolib 动画
+
+    @Override
+    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+        controllers.add(new AnimationController<>(this, "move", 5, this::animateBody));
+    }
+
+    @Override
+    public double getTick(Object entity) {
+        return this.age;
+    }
+
+    private PlayState animateBody(AnimationState<AICompanionEntity> state) {
+        AICompanionEntity e = state.getAnimatable();
+        double h = e.getVelocity().horizontalLengthSquared();
+        if (h > 0.04) {
+            state.getController().setAnimation(ANIM_RUN);
+        } else if (h > 1.0E-4) {
+            state.getController().setAnimation(ANIM_WALK);
+        } else {
+            state.getController().setAnimation(ANIM_IDLE);
+        }
+        return PlayState.CONTINUE;
+    }
+
+    @Override
+    public AnimatableInstanceCache getAnimatableInstanceCache() {
+        return geoCache;
     }
 
     // ------------------------------------------------------------ misc

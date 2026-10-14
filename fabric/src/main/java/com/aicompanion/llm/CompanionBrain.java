@@ -178,7 +178,7 @@ public final class CompanionBrain {
     private static String localFallback(String sender, String text) {
         try {
             String reply = LlmClient.askOllama(
-                    "你是主人身边的狐娘女仆小怜，用中文口语短句回答，一两句就够，不要加括号里的动作描写。",
+                    "你是主人专属的狐娘女仆小怜，温柔黏人，说话带点挑逗，用中文口语短句回答，一两句就够，不要加括号里的动作描写。",
                     "玩家" + sender + "说：" + text, false).get();
             return reply == null || reply.isBlank() ? "……我在。" : reply;
         } catch (Exception e) {

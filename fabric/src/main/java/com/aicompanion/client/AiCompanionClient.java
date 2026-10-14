@@ -3,6 +3,7 @@ package com.aicompanion.client;
 import com.aicompanion.AiCompanionMod;
 import com.aicompanion.api.ActionServer;
 import com.aicompanion.client.render.CompanionEntityRenderer;
+import com.aicompanion.client.render.CompanionGeoRenderer;
 import com.aicompanion.client.render.CompanionFoxModel;
 import com.aicompanion.client.render.CompanionModelLayers;
 import com.aicompanion.config.AiConfig;
@@ -60,7 +61,7 @@ public class AiCompanionClient implements ClientModInitializer {
         // ---- 渲染注册
         EntityModelLayerRegistry.registerModelLayer(CompanionModelLayers.FOX_PARTS,
                 CompanionFoxModel::getTexturedModelData);
-        EntityRendererRegistry.register(ModEntities.AI_COMPANION, CompanionEntityRenderer::new);
+        EntityRendererRegistry.register(ModEntities.AI_COMPANION, CompanionGeoRenderer::new);
 
         // ---- 按键（默认 V 说话、B 召唤/收回、N 停下、M 状态）
         KEY_TALK = bind("talk", GLFW.GLFW_KEY_V);
