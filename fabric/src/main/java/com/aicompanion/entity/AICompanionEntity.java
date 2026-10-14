@@ -1,6 +1,7 @@
 package com.aicompanion.entity;
 
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -48,12 +49,14 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
     private static final RawAnimation ANIM_IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation ANIM_WALK = RawAnimation.begin().thenLoop("walk");
     private static final RawAnimation ANIM_RUN = RawAnimation.begin().thenLoop("run");
+    private static final RawAnimation ANIM_SIT = RawAnimation.begin().thenLoop("sit");
 
     private UUID ownerUuid;
     private String ownerName = "";
     /** idle / follow / goto / mine / place / talk */
     private String taskState = "idle";
     private Vec3d lookTarget;
+    private boolean sitting = false;
 
     public AICompanionEntity(EntityType<? extends PathAwareEntity> type, World world) {
         super(type, world);
@@ -205,6 +208,18 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         this.taskState = state == null ? "idle" : state;
     }
 
+    public void setSitting(boolean s) {
+        this.sitting = s;
+        if (s) {
+            this.setVelocity(0, 0, 0);
+        }
+        this.setTaskState(s ? "sit" : "idle");
+    }
+
+    public boolean isSitting() {
+        return sitting;
+    }
+
     public Vec3d getLookTarget() {
         return lookTarget;
     }
@@ -256,6 +271,10 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
 
     private PlayState animateBody(AnimationState<AICompanionEntity> state) {
         AICompanionEntity e = state.getAnimatable();
+        if (e.sitting) {
+            state.getController().setAnimation(ANIM_SIT);
+            return PlayState.CONTINUE;
+        }
         double h = e.getVelocity().horizontalLengthSquared();
         if (h > 0.04) {
             state.getController().setAnimation(ANIM_RUN);
@@ -301,15 +320,81 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
     @Override
     public void tick() {
         super.tick();
-        if (this.getWorld().isClient() && this.age % 12 == 0 && this.getStack(0).isEmpty()) {
-            // 空手时偶尔冒个粒子，方便在人群里找到她
-            if (this.random.nextFloat() < 0.08f) {
-                this.getWorld().addParticle(ParticleTypes.HAPPY_VILLAGER,
-                        this.getX() + (this.random.nextDouble() - 0.5) * 0.6,
-                        this.getY() + 1.6 + this.random.nextDouble() * 0.3,
-                        this.getZ() + (this.random.nextDouble() - 0.5) * 0.6,
-                        0.0, 0.0, 0.0);
+        if (!this.getWorld().isClient()) {
+            return;
+        }
+
+        // 坐下：原地不动
+        if (this.sitting) {
+            this.setVelocity(0, 0, 0);
+            return;
+        }
+
+        // 跟随主人（保持 1.5~3 格，不贴脸）
+        PlayerEntity owner = resolveOwner();
+        if (owner != null && !owner.isRemoved()) {
+            double distSq = squaredDistanceTo(owner);
+            if (distSq > 9.0) {
+                moveToward(owner.getPos(), 0.22);
+            } else if (distSq > 2.25) {
+                moveToward(owner.getPos(), 0.12);
+            } else {
+                this.setVelocity(0, this.getVelocity().y * 0.5, 0);
             }
+        }
+
+        // 捡起附近的掉落物
+        pickupNearby();
+
+        // 空手时偶尔冒个粒子，方便在人群里找到她
+        if (this.age % 12 == 0 && this.getStack(0).isEmpty() && this.random.nextFloat() < 0.08f) {
+            this.getWorld().addParticle(ParticleTypes.HAPPY_VILLAGER,
+                    this.getX() + (this.random.nextDouble() - 0.5) * 0.6,
+                    this.getY() + 1.6 + this.random.nextDouble() * 0.3,
+                    this.getZ() + (this.random.nextDouble() - 0.5) * 0.6,
+                    0.0, 0.0, 0.0);
+        }
+    }
+
+    /** 朝目标走：设水平速度，撞墙或目标更高就跳。 */
+    private void moveToward(Vec3d target, double speed) {
+        Vec3d me = this.getPos();
+        Vec3d d = target.subtract(me);
+        double h = Math.sqrt(d.x * d.x + d.z * d.z);
+        if (h < 0.05) {
+            return;
+        }
+        this.setVelocity(d.x / h * speed, this.getVelocity().y, d.z / h * speed);
+        this.faceTowards(target);
+        if (this.horizontalCollision && this.isOnGround()) {
+            this.hop();
+        }
+        if (d.y > 1.0 && this.isOnGround() && Math.abs(d.x) + Math.abs(d.z) < 2.0) {
+            this.hop();
+        }
+    }
+
+    /** 捡起 8 格内最近的掉落物。 */
+    private void pickupNearby() {
+        java.util.List<ItemEntity> items = this.getWorld().getEntitiesByClass(
+                ItemEntity.class, this.getBoundingBox().expand(8.0), e -> e != null && !e.isRemoved());
+        ItemEntity best = null;
+        double bestD = Double.MAX_VALUE;
+        for (ItemEntity it : items) {
+            double dd = squaredDistanceTo(it);
+            if (dd < bestD) {
+                bestD = dd;
+                best = it;
+            }
+        }
+        if (best == null) {
+            return;
+        }
+        if (bestD <= 1.5) {
+            this.insert(best.getStack());
+            best.discard();
+        } else if (bestD > 4.0) {
+            moveToward(best.getPos(), 0.18);
         }
     }
 
@@ -332,6 +417,7 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         if (ownerUuid != null) nbt.putUuid("Owner", ownerUuid);
         nbt.putString("OwnerName", ownerName == null ? "" : ownerName);
         nbt.putString("TaskState", taskState);
+        nbt.putBoolean("Sitting", sitting);
     }
 
     @Override
@@ -343,5 +429,6 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         if (nbt.containsUuid("Owner")) ownerUuid = nbt.getUuid("Owner");
         ownerName = nbt.getString("OwnerName");
         if (nbt.contains("TaskState")) taskState = nbt.getString("TaskState");
+        sitting = nbt.getBoolean("Sitting");
     }
 }

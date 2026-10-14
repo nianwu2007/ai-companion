@@ -4,6 +4,7 @@ import com.aicompanion.config.AiConfig;
 import com.aicompanion.core.Async;
 import com.aicompanion.core.ChatSink;
 import com.aicompanion.core.State;
+import com.aicompanion.entity.AICompanionEntity;
 import com.aicompanion.llm.Action;
 
 import net.minecraft.block.BlockState;
@@ -201,6 +202,8 @@ public final class PlayerEngine implements State.Provider {
                 case "jump" -> doJump(mc, p, current);
                 case "wait" -> doWait(mc, p, current);
                 case "say" -> doSay(mc, p, current);
+                case "sit" -> doSit(mc, p, current);
+                case "stand" -> doStand(mc, p, current);
                 case "stop" -> doStop(mc, p, current);
                 default -> done("未知动作 " + current.type());
             }
@@ -458,6 +461,28 @@ public final class PlayerEngine implements State.Provider {
     private void doStop(MinecraftClient mc, ClientPlayerEntity p, Action a) {
         stopAll();
         done("停下了");
+    }
+
+    /** 让小怜坐下。 */
+    private void doSit(MinecraftClient mc, ClientPlayerEntity p, Action a) {
+        Entity e = CompanionHandle.get(mc);
+        if (e instanceof AICompanionEntity c) {
+            c.setSitting(true);
+            done("坐下了");
+        } else {
+            done("没找到小怜");
+        }
+    }
+
+    /** 让小怜站起来。 */
+    private void doStand(MinecraftClient mc, ClientPlayerEntity p, Action a) {
+        Entity e = CompanionHandle.get(mc);
+        if (e instanceof AICompanionEntity c) {
+            c.setSitting(false);
+            done("站起来了");
+        } else {
+            done("没找到小怜");
+        }
     }
 
     // ---------------------------------------------------------------- 跟人

@@ -54,18 +54,16 @@ public final class CompanionHandle {
             companion.setCustomName(Text.literal(cfg.name));
             companion.setCustomNameVisible(true);
             companion.setInvulnerable(true);
-            companion.setNoGravity(true);
             companion.setSilent(false);
             world.addEntity(companion.getId(), companion);
             current = companion;
             AiCompanionMod.LOG.info("[AI同伴] 实体已就位：{}", cfg.name);
             return companion;
         }
-        softlyFollow(mc, e);
         return e;
     }
 
-    /** 每 tick 轻轻贴住玩家，只在走远时瞬移，避免抖动。 */
+    /** 每 tick 只兜底：走丢（>30 格）才瞬移拉回，平时让小怜自己走。 */
     public static void tick(MinecraftClient mc) {
         Entity e = get(mc);
         if (e == null || mc.player == null) {
@@ -75,26 +73,10 @@ public final class CompanionHandle {
             current = null;
             return;
         }
-        e.setNoGravity(true);
-        e.fallDistance = 0f;
-        softlyFollow(mc, e);
-    }
-
-    private static void softlyFollow(MinecraftClient mc, Entity e) {
-        Vec3d want = spotNear(mc);
-        double d = e.getPos().distanceTo(want);
-        if (d > 12) {
+        if (e.getPos().distanceTo(mc.player.getPos()) > 30) {
+            Vec3d want = spotNear(mc);
             e.refreshPositionAndAngles(want.x, want.y, want.z, mc.player.getYaw(), 0f);
-            return;
         }
-        if (d > 2.5) {
-            Vec3d step = want.subtract(e.getPos()).multiply(0.25);
-            e.setVelocity(step.x, step.y, step.z);
-        } else {
-            e.setVelocity(0, 0, 0);
-        }
-        e.setYaw(mc.player.getYaw());
-        e.setPitch(0f);
     }
 
     /** 玩家右手边一格半、脚踩实地。 */
