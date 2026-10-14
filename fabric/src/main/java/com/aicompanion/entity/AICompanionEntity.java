@@ -2,6 +2,9 @@ package com.aicompanion.entity;
 
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.ai.goal.Goal;
+import net.minecraft.entity.ai.goal.LookAtEntityGoal;
+import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -62,6 +65,7 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         super(type, world);
         this.setPersistent();
         this.experiencePoints = 0;
+        this.initGoals();
     }
 
     public static DefaultAttributeContainer.Builder createCompanionAttributes() {
@@ -330,21 +334,9 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
             return;
         }
 
-        // 跟随主人（保持 1.5~3 格，不贴脸）
-        PlayerEntity owner = resolveOwner();
-        if (owner != null && !owner.isRemoved()) {
-            double distSq = squaredDistanceTo(owner);
-            if (distSq > 9.0) {
-                moveToward(owner.getPos(), 0.22);
-            } else if (distSq > 2.25) {
-                moveToward(owner.getPos(), 0.12);
-            } else {
-                this.setVelocity(0, this.getVelocity().y * 0.5, 0);
-            }
-        }
-
-        // 捡起附近的掉落物
-        pickupNearby();
+        // 客户端手动驱动 AI 目标 + 寻路（原版 mobTick 只在服务端跑）
+        this.goalSelector.tick();
+        this.getNavigation().tick();
 
         // 空手时偶尔冒个粒子，方便在人群里找到她
         if (this.age % 12 == 0 && this.getStack(0).isEmpty() && this.random.nextFloat() < 0.08f) {
@@ -356,26 +348,98 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
         }
     }
 
-    /** 朝目标走：设水平速度，撞墙或目标更高就跳。 */
-    private void moveToward(Vec3d target, double speed) {
-        Vec3d me = this.getPos();
-        Vec3d d = target.subtract(me);
-        double h = Math.sqrt(d.x * d.x + d.z * d.z);
-        if (h < 0.05) {
-            return;
+    // ------------------------------------------------------------ AI 行为
+
+    /** 客户端实体默认 canMoveVoluntarily 只在 ServerWorld 返回 true，导致 travel 不位移；放开。 */
+    @Override
+    public boolean canMoveVoluntarily() {
+        return true;
+    }
+
+    @Override
+    protected void initGoals() {
+        this.goalSelector.add(1, new FollowOwnerGoal());
+        this.goalSelector.add(2, new PickupGoal());
+        this.goalSelector.add(3, new WanderAroundFarGoal(this, 0.7));
+        this.goalSelector.add(4, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
+    }
+
+    /** 跟随主人：离远寻路追，近就停。 */
+    private class FollowOwnerGoal extends Goal {
+        private int pathTimer = 0;
+
+        @Override
+        public boolean canStart() {
+            if (sitting) return false;
+            PlayerEntity o = resolveOwner();
+            return o != null && !o.isRemoved() && squaredDistanceTo(o) > 9.0;
         }
-        this.setVelocity(d.x / h * speed, this.getVelocity().y, d.z / h * speed);
-        this.faceTowards(target);
-        if (this.horizontalCollision && this.isOnGround()) {
-            this.hop();
+
+        @Override
+        public boolean shouldContinue() {
+            if (sitting) return false;
+            PlayerEntity o = resolveOwner();
+            return o != null && !o.isRemoved() && squaredDistanceTo(o) > 2.25;
         }
-        if (d.y > 1.0 && this.isOnGround() && Math.abs(d.x) + Math.abs(d.z) < 2.0) {
-            this.hop();
+
+        @Override
+        public void tick() {
+            PlayerEntity o = resolveOwner();
+            if (o == null) return;
+            getLookControl().lookAt(o, 10.0f, 10.0f);
+            if (--pathTimer <= 0) {
+                pathTimer = 10;
+                getNavigation().startMovingTo(o, 1.0);
+            }
+            // 客户端寻路没路径就直线兜底，保证能动
+            if (getNavigation().isIdle()) {
+                straightTo(o, 0.2);
+            }
+        }
+
+        @Override
+        public void stop() {
+            getNavigation().stop();
         }
     }
 
-    /** 捡起 8 格内最近的掉落物。 */
-    private void pickupNearby() {
+    /** 捡起附近掉落物。 */
+    private class PickupGoal extends Goal {
+        private ItemEntity target;
+
+        @Override
+        public boolean canStart() {
+            if (sitting) return false;
+            target = findNearestItem();
+            return target != null;
+        }
+
+        @Override
+        public boolean shouldContinue() {
+            return !sitting && target != null && !target.isRemoved() && squaredDistanceTo(target) > 1.2;
+        }
+
+        @Override
+        public void tick() {
+            if (target == null) return;
+            getNavigation().startMovingTo(target, 1.1);
+            if (getNavigation().isIdle()) {
+                straightTo(target, 0.2);
+            }
+        }
+
+        @Override
+        public void stop() {
+            if (target != null && !target.isRemoved() && squaredDistanceTo(target) <= 2.5) {
+                insert(target.getStack());
+                target.discard();
+            }
+            target = null;
+            getNavigation().stop();
+        }
+    }
+
+    private ItemEntity findNearestItem() {
         java.util.List<ItemEntity> items = this.getWorld().getEntitiesByClass(
                 ItemEntity.class, this.getBoundingBox().expand(8.0), e -> e != null && !e.isRemoved());
         ItemEntity best = null;
@@ -387,14 +451,20 @@ public class AICompanionEntity extends PathAwareEntity implements GeoAnimatable 
                 best = it;
             }
         }
-        if (best == null) {
+        return best;
+    }
+
+    /** 直线兜底：直接位移，撞墙就跳。 */
+    private void straightTo(net.minecraft.entity.Entity target, double speed) {
+        Vec3d d = target.getPos().subtract(this.getPos());
+        double h = Math.sqrt(d.x * d.x + d.z * d.z);
+        if (h < 0.05) {
             return;
         }
-        if (bestD <= 1.5) {
-            this.insert(best.getStack());
-            best.discard();
-        } else if (bestD > 4.0) {
-            moveToward(best.getPos(), 0.18);
+        this.move(net.minecraft.entity.MovementType.SELF, new Vec3d(d.x / h * speed, 0, d.z / h * speed));
+        this.faceTowards(target.getPos());
+        if (this.horizontalCollision && this.isOnGround()) {
+            this.hop();
         }
     }
 
