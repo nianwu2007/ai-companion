@@ -4,8 +4,11 @@
 会听你说话，也会开口回你。整套链路零云端成本：思考用本地 Ollama，耳朵是 Vosk，嗓子是 Edge TTS 或 Kokoro。
 只有你特意加上 `@AI` 前缀的那一句，才会送去云端大脑。
 
-她穿着一身随包附带的女仆装：栗色长发、白色蕾丝发箍、黑裙白围裙。想让她换成别的样子，
-改 `config/aicompanion.json` 里的 `companion.texture` 指到任意皮肤贴图即可。
+她穿着随包附带的女仆装，一身酒狐配色：金橙长发、白围裙、深蓝黑裙、红肩饰、白长袜。
+头顶另有一对狐耳、脑后垂一束长发、身后拖一条三节大尾巴，耳朵和后发跟着头转，尾巴一直在轻摇。
+想让她换成别的样子，改 `config/aicompanion.json` 里的 `companion.texture` 即可；
+狐狸零件在 `fabric/src/main/java/com/aicompanion/client/render/CompanionFoxModel.java`
+与 `CompanionFoxFeature.java`，贴图是 `assets/aicompanion/textures/entity/fox_parts.png`。
 
 ---
 

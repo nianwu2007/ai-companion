@@ -29,6 +29,8 @@ public class CompanionEntityRenderer
                         AiConfig.INSTANCE.companion.slimArms),
                 0.5f);
         this.addFeature(new HeldItemFeatureRenderer<>(this, ctx.getHeldItemRenderer()));
+        // 酒狐零件：狐耳 + 后发 + 尾巴
+        this.addFeature(new CompanionFoxFeature(this, ctx.getPart(CompanionModelLayers.FOX_PARTS)));
         this.texture = parseTexture(AiConfig.INSTANCE.companion.texture);
     }
 

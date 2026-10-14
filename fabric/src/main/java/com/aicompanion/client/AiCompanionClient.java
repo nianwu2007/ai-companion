@@ -3,6 +3,8 @@ package com.aicompanion.client;
 import com.aicompanion.AiCompanionMod;
 import com.aicompanion.api.ActionServer;
 import com.aicompanion.client.render.CompanionEntityRenderer;
+import com.aicompanion.client.render.CompanionFoxModel;
+import com.aicompanion.client.render.CompanionModelLayers;
 import com.aicompanion.config.AiConfig;
 import com.aicompanion.core.Async;
 import com.aicompanion.core.State;
@@ -20,6 +22,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 
 import net.minecraft.client.MinecraftClient;
@@ -55,6 +58,8 @@ public class AiCompanionClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         // ---- 渲染注册
+        EntityModelLayerRegistry.registerModelLayer(CompanionModelLayers.FOX_PARTS,
+                CompanionFoxModel::getTexturedModelData);
         EntityRendererRegistry.register(ModEntities.AI_COMPANION, CompanionEntityRenderer::new);
 
         // ---- 按键（默认 V 说话、B 召唤/收回、N 停下、M 状态）

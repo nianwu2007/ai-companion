@@ -3,6 +3,7 @@ package com.aicompanion.llm;
 import com.aicompanion.config.AiConfig;
 import com.aicompanion.core.Async;
 import com.aicompanion.core.State;
+import com.aicompanion.util.Json;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -104,9 +105,37 @@ public final class CompanionBrain {
                     // 云端挂了就退回本地，别让玩家等
                     return new Result(localFallback(sender, userText), List.of(), false);
                 }
+                // 云端回复同样按 JSON 解析：拆出「说话」和「动作」。
+                // 以前这里直接 new Result(reply, List.of(), true)，动作恒为空 → 小怜只会把 JSON 念在聊天栏里。
+                String json = Llm.firstJsonObject(reply);
+                List<Action> actions = new ArrayList<>();
+                String say = reply;
+                if (json != null && !json.isBlank()) {
+                    List<Action> parsed = Llm.parseActions(json);
+                    String s = Llm.extractSay(json, "");
+                    if (s.isBlank()) {
+                        try {
+                            s = Json.str(json, "text");   // 兼容旧版单数格式 {"action":"say","text":"…"}
+                        } catch (RuntimeException ignored) {
+                            s = "";
+                        }
+                    }
+                    if (s == null) {
+                        s = "";
+                    }
+                    if (!parsed.isEmpty() || !s.isBlank()) {
+                        actions.addAll(parsed);
+                        say = s;
+                    }
+                }
+                if (actions.size() > 6) {
+                    actions = new ArrayList<>(actions.subList(0, 6));
+                }
                 remember(Llm.Msg.user(userText));
-                remember(Llm.Msg.assistant(reply));
-                return new Result(reply, List.of(), true);
+                if (!say.isBlank()) {
+                    remember(Llm.Msg.assistant(say));
+                }
+                return new Result(say, actions, true);
             });
         }
 
